@@ -11,59 +11,135 @@ def writeToDoc(location_array, name_array):
 	
 	f = open("location_test.txt","w+")
 	for line in location_array: 
-		f.write("Entry: %s, Word: %s, Type: %s \n" % (line[0], line[1], line[2]))
+		f.write("Entry: %s \t Word: %s\t Type: %s \n" % (line[0], line[1], line[2]))
 	f.close()
 
-	f_n = open("name_test.txt", "w+")
+	f_n = open("name_test.tsv", "w+")
+	f_n.write("Entry \t Word \t ID \n")
 	for line in name_array: 
-		f_n.write("Entry: %s, Word: %s, ID: %s \n" % (line[0], line[1], line[2]))
+		f_n.write("%s \t %s \t %s \n" % (line[0], line[1], line[2]))
 	f_n.close()
 
 def setCorrectID(name_array, file_lines): 
-	id_reference = {} 
-	temp_id_list = []
+	# same data in these two arrays, but formatted differently
+	temp_id_list = {}
+	name_list = {}
+
+	f_n = open("debug_two.txt", "w+")
 	for line in file_lines: 
 		main_name_regex = '([A-Z]{3,}(,( [A-Z]+)+)?)'
 		matches = re.findall(main_name_regex, line[1])
 		if not matches:
-			# print matches, line[0]
 			continue
 
-		if matches:
-			# print matches[0]
-			id_tup = (line[0], matches[0][0].lower()) # ID, followed by name
-			temp_id_list.append(id_tup)
-			#print id_tup
+		 #if this match exists 
+		raw_name = matches[0][0].lower()
+		first_last_name = raw_name.split(", ")
+		name = raw_name # create the name 
 
-	for name in name_array:
-		id_number = name[2]
-		# access ID number, name 
-		if id_number in id_reference:
-			name[2] = id_reference[id_number][1]
-		else:
-			# look for name 
-			# id_number = look_for_name(name, temp_id_list)
-			#id_reference[id_number] = 
-			# print look_for_name(name, temp_id_list)
-			#id_reference[id_number] = look_for_name(name, temp_id_list)
-			# print id_reference[id_number]
-			# id_reference[name[2]] =
-			#print name[1].lower()
-			# find the appropriate name here 
-			#print name
+		if len(first_last_name) > 1: 
+			name = first_last_name[1] + " " + first_last_name[0]
 
-def look_for_name(name, temp_id_list): 
-	main_index = int(name[0])
-	# print temp_id_list[main_index][1], ", ", name[1].lower()
-	if name[1].lower() in temp_id_list[main_index][1]:
-		print temp_id_list[main_index][1], ", ", name[1].lower()
-		return temp_id_list[main_index]
+		id_tup = (line[0], name) # ID, followed by name
+		temp_id_list[int(line[0])] = id_tup
+		name_list[name] = line[0]
+		f_n.write("%s \t %s \t %s \n" % (raw_name, name, line[0]))
 
+
+	# id reference lookup is the table of direct names IDs to their paragraph usages 
+	id_reference_lookup = define_main_names(name_array, temp_id_list)
+	name_array, temp_id_list = remove_names (name_array, temp_id_list)
+	name_array = look_for_name(name_array, temp_id_list, id_reference_lookup)
+
+	return look_for_name_2(name_array, name_list)
+
+def define_main_names (name_array, temp_id_list): 
+	id_reference = {}
+	copy_of_temp_id_list = temp_id_list
 	
-	#for id_value in temp_id_list:
+	f_n = open("debug.txt", "w+")
+	previous_index = int(name_array[0][0])
+
+	for i, name in enumerate(name_array): 
+		main_index = int(name[0])
+
+
+		if name[1].lower() in copy_of_temp_id_list[main_index][1]: 
+			if name[2] == '-1' or id_reference.has_key(name[2]):
+				continue
+			id_reference[name[2]] = (name[1], copy_of_temp_id_list[main_index][0])
+			f_n.write("%s \t %s \t %s \n" % (name[2], name[1], copy_of_temp_id_list[main_index][0]))
 
 
 
+	return id_reference
+
+def remove_names (name_array, temp_id_list): 
+	j = 0
+
+	for i in xrange(0, len(temp_id_list)):
+		paragraph_index = int(name_array[j][0])
+		
+		while (paragraph_index == i): 
+			name = name_array[j] # easier declaration 
+
+			# here, iterate through name list 
+			if name[1].lower() in temp_id_list[paragraph_index][1]: 
+				del name_array[j]
+			else: 
+				j = j + 1
+
+			paragraph_index = int(name_array[j][0])
+
+	return name_array, temp_id_list
+
+# first iteration of looking through names based on ID 
+def look_for_name(name_array, temp_id_list, id_reference_lookup): 
+	updated_name_array = []
+
+	for i, name in enumerate(name_array): 
+		main_ID = name[2]
+
+		if not id_reference_lookup.has_key(main_ID):
+			updated_name_array.append((name[0], name[1], '-1'))
+			continue
+
+		tup2 = (name[0], name[1], id_reference_lookup[main_ID][1])
+		updated_name_array.append(tup2)
+	
+	return updated_name_array
+
+def look_for_name_2(name_array, name_list): 
+
+	# test case
+	array = {'hugh leycester':1, 'oswald leycester': 2948} 
+	string = 'hugh leycester'
+	
+	print 'oswald leycester' in name_list
+
+	print string in array
+	updated_name_array = []
+	for i, name in enumerate(name_array): 
+		if name[2] != '-1': 
+			updated_name_array.append(name)
+			continue
+
+		list_of_names = createNames(name)
+
+		for name_i in list_of_names:
+			if name_i.lower() in name_list:
+				print name_i
+				updated_name_array.append((name[0], name[1], name_list[name_i.lower()]))
+				continue
+
+	return updated_name_array
+		
+
+def createNames (name): 
+	if len(name) == 1:
+		return name[1]
+	list_of_names = [name[1]]
+	return list_of_names
 
 
 def main(): 
@@ -75,7 +151,7 @@ def main():
 
 
 	file_tokens = []
-	#file_lines = []
+	file_lines = []
 	
 	# convert file types to array
 	for line in f_lines:
@@ -85,7 +161,6 @@ def main():
 	for entry in f_tokens:
 		file_tokens.append(entry.split())
 
-	# begin sorting ++ appending here 
 
 	## iterate through file lines, too! 
 	current_narrative_index = -1 
@@ -101,7 +176,6 @@ def main():
 
 
 		line_array = file_tokens[i]
-		# print line_array[7], line_array[11]
 
 		if line_array[11] == 'LOCATION' or line_array[11] == 'PERSON':
 			while current_narrative_index < len(file_lines) and line_array[7] not in file_lines[current_narrative_index][3]:
@@ -116,6 +190,7 @@ def main():
 		elif line_array[11] == 'PERSON' or line_array[10] == 'PERSON':
 			full_name = line_array[7]
 			characterID = line_array[len(line_array)-1] # last index is character ID, extract here
+			
 			while file_tokens[i + 1][11] == 'PERSON' or file_tokens[i + 1][10] == 'PERSON':
 				full_name = full_name + ' ' + file_tokens[i + 1][7]
 				i = i + 1
@@ -125,12 +200,8 @@ def main():
 			name_array.append(name_tup)
 
 
-	setCorrectID(name_array, file_lines)	
-	writeToDoc(location_array, name_array)
-
-
-
-
+	updated_name_array = setCorrectID(name_array, file_lines)	
+	writeToDoc(location_array, updated_name_array)
 
 
 if __name__ == "__main__":
